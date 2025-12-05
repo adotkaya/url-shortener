@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
+	"time"
 )
 
 type Url struct {
@@ -25,10 +27,25 @@ func createUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := "url1"
+	id := generateShortID()
 	urlStore[id] = originalURL
 
 	fmt.Fprintf(w, "Shortened URL: http://localhost:8080/%s", id)
+}
+
+func generateShortID() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 6
+
+	rand.Seed(time.Now().UnixNano())
+
+	shortKey := make([]byte, length)
+
+	for i := range shortKey {
+		shortKey[i] = charset[rand.Intn(len(charset))]
+	}
+
+	return string(shortKey)
 }
 
 func main() {
