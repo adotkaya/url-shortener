@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net/http"
+	"os"
+	"sync"
 	"time"
 )
 
@@ -13,6 +16,7 @@ type Url struct {
 }
 
 var urlStore = make(map[string]string)
+var mu sync.Mutex
 
 func createUrl(w http.ResponseWriter, r *http.Request) {
 
@@ -28,6 +32,8 @@ func createUrl(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := generateShortID()
+	mu.Lock()
+	defer mu.Unlock()
 	urlStore[id] = originalURL
 
 	fmt.Fprintf(w, "Shortened URL: http://localhost:8080/%s", id)
@@ -48,20 +54,44 @@ func generateShortID() string {
 	return string(shortKey)
 }
 
+func redirectURL(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Path[1:]
+	mu.Lock()
+	targetURL, exists := urlStore[id]
+	mu.Unlock()
+
+	if !exists {
+		http.Error(w, "URL not found", http.StatusNotFound)
+		return
+	}
+	http.Redirect(w, r, targetURL, http.StatusFound)
+}
+
+func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		next(w, r)
+
+		duration := time.Since(start)
+
+		slog.Info("Request processed",
+			"method", r.Method,
+			"url", r.URL.String(),
+			"duration", duration,
+			"remote_addr", r.RemoteAddr,
+			"user_agent", r.UserAgent(),
+		)
+	}
+}
+
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		id := r.URL.Path[1:]
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
 
-		targetURL, exists := urlStore[id]
-		if !exists {
-			http.Error(w, "URL not found", http.StatusNotFound)
-			return
-		}
-
-		http.Redirect(w, r, targetURL, http.StatusFound)
-	})
+	http.HandleFunc("/create", loggingMiddleware(createUrl))
+	http.HandleFunc("/", loggingMiddleware(redirectURL))
 
 	fmt.Println("Listening on port 8080")
-	http.HandleFunc("/create", createUrl)
 	http.ListenAndServe(":8080", nil)
 }
