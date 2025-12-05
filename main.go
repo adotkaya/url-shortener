@@ -28,12 +28,20 @@ func createUrl(w http.ResponseWriter, r *http.Request) {
 	id := "url1"
 	urlStore[id] = originalURL
 
-	fmt.Fprintf(w, "Shortened URL: http://localhost:808/%s", id)
+	fmt.Fprintf(w, "Shortened URL: http://localhost:8080/%s", id)
 }
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "System Operational")
+		id := r.URL.Path[1:]
+
+		targetURL, exists := urlStore[id]
+		if !exists {
+			http.Error(w, "URL not found", http.StatusNotFound)
+			return
+		}
+
+		http.Redirect(w, r, targetURL, http.StatusFound)
 	})
 
 	fmt.Println("Listening on port 8080")
