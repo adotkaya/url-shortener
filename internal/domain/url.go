@@ -1,3 +1,18 @@
+// ============================================================================
+// DOMAIN LAYER - URL.GO
+// ============================================================================
+// This file defines the URL domain model and its business logic.
+//
+// KEY CONCEPTS:
+// 1. Domain-Driven Design (DDD) - Business logic lives in domain models
+// 2. Structs - Custom data types (like C# classes)
+// 3. Methods - Functions attached to structs (like C# instance methods)
+// 4. Pointers - Nullable fields and memory efficiency
+// 5. Builder Pattern - Fluent API for object construction
+//
+// .NET COMPARISON: This is like a C# entity class with validation methods
+// ============================================================================
+
 package domain
 
 import (
@@ -7,9 +22,39 @@ import (
 	"time"
 )
 
-// URL represents a shortened URL in our system
-// This is our "domain model" - it contains both data AND behavior (methods)
-// In Go, we use structs to define data structures
+// ============================================================================
+// URL STRUCT - THE DOMAIN MODEL
+// ============================================================================
+// URL represents a shortened URL in our system.
+// This is our "domain model" - it contains both DATA and BEHAVIOR (methods).
+//
+// STRUCT vs CLASS:
+// Go structs are similar to C# classes but simpler:
+// - No inheritance (composition over inheritance)
+// - No constructors (use factory functions instead)
+// - Methods are defined separately with receivers
+//
+// POINTERS FOR NULLABLE FIELDS:
+// - string     → Required field (cannot be null)
+// - *string    → Optional field (can be nil)
+// - time.Time  → Required timestamp
+// - *time.Time → Optional timestamp
+//
+// .NET EQUIVALENT:
+//
+//	public class URL {
+//	    public string ID { get; set; }
+//	    public string ShortCode { get; set; }
+//	    public string OriginalURL { get; set; }
+//	    public string? CustomAlias { get; set; }  // Nullable
+//	    public DateTime CreatedAt { get; set; }
+//	    public DateTime? ExpiresAt { get; set; }  // Nullable
+//	    public long Clicks { get; set; }
+//	    public string CreatedBy { get; set; }
+//	    public bool IsActive { get; set; }
+//	}
+//
+// ============================================================================
 type URL struct {
 	ID          string     // UUID for internal identification
 	ShortCode   string     // The short identifier (e.g., "abc123")
@@ -22,8 +67,24 @@ type URL struct {
 	IsActive    bool       // Soft delete flag
 }
 
-// Domain errors - defining errors as constants makes them testable
-// and allows callers to check for specific error types
+// ============================================================================
+// DOMAIN ERRORS - SENTINEL ERRORS
+// ============================================================================
+// Defining errors as package-level variables (sentinel errors) allows:
+// 1. Callers to check for specific error types using errors.Is()
+// 2. Consistent error messages across the application
+// 3. Type-safe error handling
+//
+// USAGE:
+//
+//	if errors.Is(err, domain.ErrURLExpired) {
+//	    // Handle expired URL specifically
+//	}
+//
+// .NET EQUIVALENT:
+// public class URLExpiredException : Exception { }
+// throw new URLExpiredException("URL has expired");
+// ============================================================================
 var (
 	ErrInvalidURL         = errors.New("invalid URL format")
 	ErrEmptyURL           = errors.New("URL cannot be empty")
@@ -33,16 +94,43 @@ var (
 	ErrCustomAliasInvalid = errors.New("custom alias must be alphanumeric and 3-20 characters")
 )
 
-// IsExpired checks if the URL has passed its expiration time
-// This is a METHOD on the URL struct - it has access to the struct's fields via the receiver (u *URL)
-// Methods in Go are functions with a receiver parameter
+// ============================================================================
+// METHODS - BEHAVIOR ATTACHED TO THE STRUCT
+// ============================================================================
+// IsExpired checks if the URL has passed its expiration time.
+//
+// METHOD SYNTAX:
+// func (u *URL) IsExpired() bool
+//
+//	↑      ↑
+//	|      └─ Receiver: gives method access to struct fields
+//	└──────── Pointer receiver: can read/modify the struct
+//
+// POINTER RECEIVER (*URL) vs VALUE RECEIVER (URL):
+// - *URL: Can modify the struct, more efficient for large structs
+// - URL:  Read-only copy, safe but less efficient
+//
+// RULE OF THUMB: Use pointer receivers unless you have a reason not to
+//
+// .NET EQUIVALENT:
+//
+//	public bool IsExpired() {
+//	    if (ExpiresAt == null) return false;
+//	    return DateTime.Now > ExpiresAt.Value;
+//	}
+//
+// ============================================================================
 func (u *URL) IsExpired() bool {
+	// POINTER DEREFERENCING:
+	// u.ExpiresAt is *time.Time (pointer to time.Time)
+	// *u.ExpiresAt dereferences the pointer to get the actual time.Time value
+
 	// If ExpiresAt is nil (not set), the URL never expires
 	if u.ExpiresAt == nil {
 		return false
 	}
 	// Check if current time is after expiration time
-	return time.Now().After(*u.ExpiresAt)
+	return time.Now().After(*u.ExpiresAt) // * = dereference pointer
 }
 
 // CanBeAccessed checks if the URL can be used for redirection

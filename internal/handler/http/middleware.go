@@ -1,3 +1,25 @@
+// ============================================================================
+// MIDDLEWARE.GO - CROSS-CUTTING CONCERNS
+// ============================================================================
+// Middleware functions wrap HTTP handlers to add functionality like logging,
+// authentication, CORS, panic recovery, etc.
+//
+// KEY CONCEPTS:
+// 1. Middleware Pattern - Composable request/response processing
+// 2. Function Closures - Functions that capture variables from outer scope
+// 3. Higher-Order Functions - Functions that take/return other functions
+// 4. Panic Recovery - Preventing server crashes
+// 5. Context Propagation - Passing request-scoped data
+//
+// MIDDLEWARE SIGNATURE:
+// func(http.Handler) http.Handler
+//      ↑                ↑
+//      |                └─ Returns wrapped handler
+//      └───────────────── Takes handler to wrap
+//
+// .NET EQUIVALENT: ASP.NET Core middleware pipeline
+// ============================================================================
+
 package http
 
 import (
@@ -9,27 +31,50 @@ import (
 	"github.com/google/uuid"
 )
 
-// Middleware is a function that wraps an http.Handler
-// This is the MIDDLEWARE PATTERN in Go
-// Middleware can:
-// 1. Execute code before the handler
-// 2. Execute code after the handler
-// 3. Modify the request or response
-// 4. Short-circuit the request (e.g., authentication failure)
-
-// LoggingMiddleware logs HTTP requests with structured logging
+// ============================================================================
+// LOGGING MIDDLEWARE
+// ============================================================================
+// LoggingMiddleware logs HTTP requests with structured logging.
+//
+// FUNCTION CLOSURE EXPLAINED:
+// This function returns a function that returns a function!
+//
+//	func LoggingMiddleware(logger) func(http.Handler) http.Handler {
+//	     ↑                              ↑
+//	     |                              └─ Returns middleware function
+//	     └────────────────────────────────── Takes logger parameter
+//
+// WHY CLOSURE?
+// The returned function "closes over" the logger variable, meaning it
+// captures and remembers the logger even after LoggingMiddleware returns.
+//
+// .NET EQUIVALENT:
+//
+//	public class LoggingMiddleware {
+//	    private readonly ILogger _logger;
+//	    public LoggingMiddleware(ILogger logger) { _logger = logger; }
+//	    public async Task InvokeAsync(HttpContext context, RequestDelegate next) {
+//	        var start = DateTime.Now;
+//	        await next(context);
+//	        var duration = DateTime.Now - start;
+//	        _logger.LogInformation("Request completed in {Duration}ms", duration);
+//	    }
+//	}
+//
+// ============================================================================
 func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 
 			// Create a response writer wrapper to capture status code
+			// (http.ResponseWriter doesn't expose the status code by default)
 			wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
-			// Call the next handler
+			// Call the next handler in the chain
 			next.ServeHTTP(wrapped, r)
 
-			// Log after the request is processed
+			// Log after the request is processed (we now have the status code)
 			duration := time.Since(start)
 			logger.Info("HTTP request",
 				"method", r.Method,
