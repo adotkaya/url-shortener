@@ -1,0 +1,123 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.txt
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Environment files - NEVER commit these!
+.env
+.env.local
+.env.*.local
+
+# IDE - JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IDE - VSCode
+.vscode/
+*.code-workspace
+
+# IDE - Vim
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# IDE - Emacs
+*~
+\#*\#
+.\#*
+
+# OS - macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# OS - Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+
+# OS - Linux
+.directory
+.Trash-*
+
+# Application build artifacts
+bin/
+build/
+dist/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Docker volumes (data persists in named volumes, not in repo)
+# These are created by docker-compose
+postgres_data/
+redis_data/
+prometheus_data/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Air (live reload tool) - if you add it later
+tmp/
+.air.toml
+
+# Database files (if using SQLite for testing)
+*.db
+*.sqlite
+*.sqlite3
+
+# Go sum backup files
+go.sum.backup
+
+# Profiling data
+*.prof
+*.pprof
+cpu.prof
+mem.prof
+
+# Debug files
+debug
+__debug_bin
+
+# Certificate files (if you add HTTPS later)
+*.pem
+*.key
+*.crt
+*.cer
+
+# Compiled Object files
+*.o
+*.a
+
+# Editor backup files
+*~
+*.orig
