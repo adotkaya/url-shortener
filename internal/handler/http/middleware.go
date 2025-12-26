@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
+	"url-shortener/internal/metrics"
 
 	"github.com/google/uuid"
 )
@@ -182,12 +184,15 @@ func RateLimitMiddleware(limiter RateLimiter) func(http.Handler) http.Handler {
 					retryAfter = 0
 				}
 
+				metrics.RecordRateLimited()
+
 				w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
 				http.Error(w, "Rate limit exceeded. Please try again later.", http.StatusTooManyRequests)
 				return
 			}
 
 			// Request allowed
+			metrics.RecordRateLimitAllowed()
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -226,4 +231,92 @@ func extractIP(r *http.Request) string {
 	}
 
 	return ip
+}
+
+// MetricsMiddleware records Prometheus metrics for HTTP requests
+func MetricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		// Track in-flight requests
+		metrics.HTTPRequestsInFlight.Inc()
+		defer metrics.HTTPRequestsInFlight.Dec()
+
+		// Wrap response writer to capture status code
+		wrapped := &metricsResponseWriter{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK,
+		}
+
+		// Process request
+		next.ServeHTTP(wrapped, r)
+
+		// Record metrics
+		duration := time.Since(start).Seconds()
+		status := strconv.Itoa(wrapped.statusCode)
+
+		// Simplify endpoint for better cardinality
+		endpoint := simplifyEndpoint(r.URL.Path)
+
+		metrics.HTTPRequestDuration.WithLabelValues(
+			r.Method,
+			endpoint,
+			status,
+		).Observe(duration)
+
+		metrics.HTTPRequestsTotal.WithLabelValues(
+			r.Method,
+			endpoint,
+			status,
+		).Inc()
+	})
+}
+
+// metricsResponseWriter wraps http.ResponseWriter to capture status code
+type metricsResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (m *metricsResponseWriter) WriteHeader(code int) {
+	m.statusCode = code
+	m.ResponseWriter.WriteHeader(code)
+}
+
+// simplifyEndpoint reduces cardinality by grouping similar endpoints
+func simplifyEndpoint(path string) string {
+	// Root path
+	if path == "/" {
+		return "/"
+	}
+
+	// API endpoints
+	if strings.HasPrefix(path, "/api/v1/urls/") {
+		if strings.HasSuffix(path, "/stats") {
+			return "/api/v1/urls/:id/stats"
+		}
+		return "/api/v1/urls/:id"
+	}
+
+	if path == "/api/v1/urls" {
+		return "/api/v1/urls"
+	}
+
+	// Health check
+	if path == "/health/live" {
+		return "/health/live"
+	}
+
+	// Metrics endpoint
+	if path == "/metrics" {
+		return "/metrics"
+	}
+
+	// Static files
+	if strings.HasPrefix(path, "/static/") {
+		return "/static/*"
+	}
+
+	// Short code redirect (catch-all)
+	return "/:shortcode"
 }

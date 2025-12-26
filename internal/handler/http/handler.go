@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"url-shortener/internal/domain"
+	"url-shortener/internal/metrics"
 )
 
 // URLService interface defines the service methods needed by the handler
@@ -118,6 +119,9 @@ func (h *Handler) CreateURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Record business metric
+	metrics.RecordURLCreated()
+
 	// Build response
 	response := CreateURLResponse{
 		ID:          url.ID,
@@ -161,6 +165,9 @@ func (h *Handler) RedirectURL(w http.ResponseWriter, r *http.Request) {
 			h.logger.Error("Failed to record click", "error", err)
 		}
 	}()
+
+	// Record business metric
+	metrics.RecordRedirect()
 
 	// Perform the redirect
 	// http.StatusFound (302) is a temporary redirect

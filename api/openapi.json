@@ -1,0 +1,398 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "URL Shortener API",
+    "description": "A production-grade URL shortener service with caching, rate limiting, and analytics",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "url": "https://github.com/yourusername/url-shortener"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "URLs",
+      "description": "URL shortening operations"
+    },
+    {
+      "name": "Analytics",
+      "description": "URL analytics and statistics"
+    },
+    {
+      "name": "Health",
+      "description": "Service health checks"
+    }
+  ],
+  "paths": {
+    "/api/v1/urls": {
+      "post": {
+        "tags": ["URLs"],
+        "summary": "Create a shortened URL",
+        "description": "Creates a new shortened URL with optional custom alias and expiration",
+        "operationId": "createURL",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateURLRequest"
+              },
+              "examples": {
+                "basic": {
+                  "summary": "Basic URL shortening",
+                  "value": {
+                    "url": "https://example.com"
+                  }
+                },
+                "withAlias": {
+                  "summary": "With custom alias",
+                  "value": {
+                    "url": "https://example.com",
+                    "custom_alias": "mylink"
+                  }
+                },
+                "withExpiration": {
+                  "summary": "With expiration",
+                  "value": {
+                    "url": "https://example.com",
+                    "expires_in_hours": 24
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "URL created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateURLResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests - rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{shortCode}": {
+      "get": {
+        "tags": ["URLs"],
+        "summary": "Redirect to original URL",
+        "description": "Redirects to the original URL associated with the short code",
+        "operationId": "redirectURL",
+        "parameters": [
+          {
+            "name": "shortCode",
+            "in": "path",
+            "required": true,
+            "description": "The short code or custom alias",
+            "schema": {
+              "type": "string",
+              "example": "abc123"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to original URL",
+            "headers": {
+              "Location": {
+                "description": "The original URL",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Short code not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/urls/{shortCode}/stats": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Get URL statistics",
+        "description": "Retrieves analytics and statistics for a shortened URL",
+        "operationId": "getURLStats",
+        "parameters": [
+          {
+            "name": "shortCode",
+            "in": "path",
+            "required": true,
+            "description": "The short code or custom alias",
+            "schema": {
+              "type": "string",
+              "example": "abc123"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL statistics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/URLStatsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Short code not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "description": "Returns the health status of the service",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "time": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Prometheus metrics",
+        "description": "Returns Prometheus metrics for monitoring",
+        "operationId": "getMetrics",
+        "responses": {
+          "200": {
+            "description": "Metrics in Prometheus format",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateURLRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The original URL to shorten",
+            "example": "https://example.com"
+          },
+          "custom_alias": {
+            "type": "string",
+            "description": "Optional custom alias for the short URL",
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "minLength": 3,
+            "maxLength": 20,
+            "example": "mylink"
+          },
+          "expires_in_hours": {
+            "type": "integer",
+            "description": "Optional expiration time in hours",
+            "minimum": 1,
+            "maximum": 8760,
+            "example": 24
+          }
+        }
+      },
+      "CreateURLResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "URL created successfully"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "example": "123e4567-e89b-12d3-a456-426614174000"
+              },
+              "short_code": {
+                "type": "string",
+                "example": "abc123"
+              },
+              "short_url": {
+                "type": "string",
+                "format": "uri",
+                "example": "http://localhost:8080/abc123"
+              },
+              "original_url": {
+                "type": "string",
+                "format": "uri",
+                "example": "https://example.com"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "URLStatsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "short_code": {
+                "type": "string",
+                "example": "abc123"
+              },
+              "original_url": {
+                "type": "string",
+                "format": "uri",
+                "example": "https://example.com"
+              },
+              "clicks": {
+                "type": "integer",
+                "example": 42
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "recent_clicks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ClickInfo"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ClickInfo": {
+        "type": "object",
+        "properties": {
+          "clicked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "country_code": {
+            "type": "string",
+            "example": "US"
+          },
+          "city": {
+            "type": "string",
+            "example": "New York"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "URL is required"
+          }
+        }
+      }
+    }
+  }
+}

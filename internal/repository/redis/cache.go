@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"url-shortener/internal/domain"
+	"url-shortener/internal/metrics"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -32,6 +33,11 @@ func NewCache(client *redis.Client, ttl time.Duration) *Cache {
 // GetURL retrieves a URL from cache
 // Returns nil if not found (cache miss)
 func (c *Cache) GetURL(ctx context.Context, shortCode string) (*domain.URL, error) {
+	start := time.Now()
+	defer func() {
+		metrics.CacheOperationDuration.WithLabelValues("get").Observe(time.Since(start).Seconds())
+	}()
+
 	// Key naming convention: "url:{shortCode}"
 	key := fmt.Sprintf("url:%s", shortCode)
 
@@ -39,12 +45,16 @@ func (c *Cache) GetURL(ctx context.Context, shortCode string) (*domain.URL, erro
 	data, err := c.client.Get(ctx, key).Result()
 	if err == redis.Nil {
 		// Cache miss - not an error, just not found
+		metrics.RecordCacheMiss()
 		return nil, nil
 	}
 	if err != nil {
 		// Actual error (connection issue, etc.)
 		return nil, fmt.Errorf("redis get error: %w", err)
 	}
+
+	// Cache hit!
+	metrics.RecordCacheHit()
 
 	// Deserialize JSON to domain.URL
 	var url domain.URL
