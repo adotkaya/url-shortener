@@ -7,6 +7,12 @@ import (
 
 // ServeUI serves the web UI
 func (h *Handler) ServeUI(w http.ResponseWriter, r *http.Request) {
+	// Skip paths that should be handled by other handlers
+	if r.URL.Path == "/metrics" || r.URL.Path == "/metrics-raw" || r.URL.Path == "/api/docs" || r.URL.Path == "/api/openapi.json" || r.URL.Path == "/health/live" {
+		http.NotFound(w, r)
+		return
+	}
+
 	// Serve index.html for root path
 	if r.URL.Path == "/" {
 		http.ServeFile(w, r, filepath.Join("web", "templates", "index.html"))

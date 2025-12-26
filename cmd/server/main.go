@@ -17,6 +17,8 @@ import (
 	redisrepo "url-shortener/internal/repository/redis"
 	"url-shortener/internal/service"
 	"url-shortener/pkg/logger"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -88,6 +90,14 @@ func main() {
 
 	// Health check
 	mux.HandleFunc("/health/live", handler.HealthCheck)
+
+	// Metrics endpoints (must be before catch-all)
+	mux.HandleFunc("/metrics", httpHandler.ServeMetricsPage) // Styled page for viewing
+	mux.Handle("/metrics-raw", promhttp.Handler())           // Raw metrics for Prometheus
+
+	// API Documentation (must be before catch-all)
+	mux.HandleFunc("/api/docs", httpHandler.ServeSwagger)
+	mux.HandleFunc("/api/openapi.json", httpHandler.ServeOpenAPISpec)
 
 	// UI and redirect routes
 	// This must be last because it matches everything

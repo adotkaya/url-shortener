@@ -200,24 +200,30 @@ function truncateUrl(url, maxLength) {
 // Navigation handling
 document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
-        e.preventDefault();
+        const href = link.getAttribute('href');
 
-        // Remove active class from all links
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        // Only prevent default and handle navigation for hash links
+        if (href.startsWith('#')) {
+            e.preventDefault();
 
-        // Add active class to clicked link
-        link.classList.add('active');
+            // Remove active class from all links
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
 
-        // Handle navigation (for future dashboard/analytics pages)
-        const target = link.getAttribute('href').substring(1);
-        console.log('Navigate to:', target);
+            // Add active class to clicked link
+            link.classList.add('active');
 
-        // For now, just show a toast
-        if (target === 'dashboard') {
-            showToast('Dashboard coming soon!', 'warning');
-        } else if (target === 'analytics') {
-            showToast('Analytics coming soon!', 'warning');
+            // Handle navigation (for future dashboard/analytics pages)
+            const target = href.substring(1);
+            console.log('Navigate to:', target);
+
+            // For now, just show a toast
+            if (target === 'dashboard') {
+                showToast('Dashboard coming soon!', 'warning');
+            } else if (target === 'analytics') {
+                showToast('Analytics coming soon!', 'warning');
+            }
         }
+        // For regular links (API Docs, Metrics), let them navigate normally
     });
 });
 
