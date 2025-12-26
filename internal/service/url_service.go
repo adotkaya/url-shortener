@@ -110,7 +110,7 @@ func (s *URLService) GetURL(ctx context.Context, shortCode string) (*domain.URL,
 	if err == nil && cachedURL != nil {
 		// Cache hit! Return immediately
 		// This is ~50x faster than database lookup
-		if err := cachedURL.CanBeAccessed(); err != nil {
+		if err = cachedURL.CanBeAccessed(); err != nil {
 			return nil, err
 		}
 		return cachedURL, nil
