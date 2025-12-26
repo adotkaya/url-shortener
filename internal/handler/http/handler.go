@@ -1,26 +1,37 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"url-shortener/internal/service"
+	"url-shortener/internal/domain"
 )
+
+// URLService interface defines the service methods needed by the handler
+// Using an interface instead of concrete type allows for easy mocking in tests
+type URLService interface {
+	CreateShortURL(ctx context.Context, originalURL, customAlias, createdBy string, expiresIn time.Duration) (*domain.URL, error)
+	GetURL(ctx context.Context, shortCode string) (*domain.URL, error)
+	RecordClick(ctx context.Context, shortCode, ipAddress, userAgent, referer string) error
+	GetURLStats(ctx context.Context, shortCode string) (*domain.URL, []*domain.URLClick, error)
+	DeleteURL(ctx context.Context, id string) error
+}
 
 // Handler holds dependencies for HTTP handlers
 // This is DEPENDENCY INJECTION - we pass dependencies through the constructor
 // instead of using global variables or creating them inside handlers
 type Handler struct {
-	urlService *service.URLService
+	urlService URLService
 	logger     *slog.Logger
 	baseURL    string // Base URL for generating short URLs (e.g., "http://localhost:8080")
 }
 
 // NewHandler creates a new HTTP handler
-func NewHandler(urlService *service.URLService, logger *slog.Logger, baseURL string) *Handler {
+func NewHandler(urlService URLService, logger *slog.Logger, baseURL string) *Handler {
 	return &Handler{
 		urlService: urlService,
 		logger:     logger,
