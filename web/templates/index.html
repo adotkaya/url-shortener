@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener - Shorten Your Links</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Background gradient -->
+    <div class="background-gradient"></div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="url(#gradient)"/>
+                    <path d="M10 16L14 20L22 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
+                            <stop offset="0%" stop-color="#667eea"/>
+                            <stop offset="100%" stop-color="#764ba2"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span>LinkShort</span>
+            </div>
+            <div class="nav-links">
+                <a href="#home" class="nav-link active">Home</a>
+                <a href="#dashboard" class="nav-link">Dashboard</a>
+                <a href="#analytics" class="nav-link">Analytics</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    Shorten Your Links,
+                    <span class="gradient-text">Amplify Your Reach</span>
+                </h1>
+                <p class="hero-subtitle">
+                    Create short, memorable links with powerful analytics.
+                    Track clicks, analyze traffic, and optimize your content.
+                </p>
+            </div>
+
+            <!-- URL Shortener Card -->
+            <div class="card main-card">
+                <div class="card-header">
+                    <h2>Create Short Link</h2>
+                    <p>Transform your long URL into a short, shareable link</p>
+                </div>
+
+                <form id="shortenForm" class="shorten-form">
+                    <div class="form-group">
+                        <label for="originalUrl">Enter your long URL</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18Z" stroke="currentColor" stroke-width="1.5"/>
+                                <path d="M10 6V10L13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                            </svg>
+                            <input
+                                type="url"
+                                id="originalUrl"
+                                placeholder="https://example.com/very/long/url"
+                                required
+                                autocomplete="off"
+                            >
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="customAlias">Custom Alias (Optional)</label>
+                            <input
+                                type="text"
+                                id="customAlias"
+                                placeholder="my-custom-link"
+                                pattern="[a-zA-Z0-9_-]{3,20}"
+                            >
+                            <span class="form-hint">3-20 characters, alphanumeric only</span>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="expiresIn">Expires In (Optional)</label>
+                            <select id="expiresIn">
+                                <option value="">Never</option>
+                                <option value="1">1 Hour</option>
+                                <option value="24">24 Hours</option>
+                                <option value="168">7 Days</option>
+                                <option value="720">30 Days</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">Shorten URL</span>
+                        <svg class="btn-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M4 10H16M16 10L11 5M16 10L11 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </form>
+
+                <!-- Result Section (Hidden by default) -->
+                <div id="resultSection" class="result-section hidden">
+                    <div class="result-header">
+                        <svg class="result-icon" width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <circle cx="24" cy="24" r="24" fill="#10b981" opacity="0.1"/>
+                            <path d="M16 24L21 29L32 18" stroke="#10b981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <h3>Your Short Link is Ready!</h3>
+                    </div>
+
+                    <div class="result-content">
+                        <div class="short-url-display">
+                            <input type="text" id="shortUrl" readonly>
+                            <button class="btn-copy" onclick="copyToClipboard()">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M8 4H6C4.89543 4 4 4.89543 4 6V14C4 15.1046 4.89543 16 6 16H14C15.1046 16 16 15.1046 16 14V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                    <path d="M10 2H14C15.1046 2 16 2.89543 16 4V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                                Copy
+                            </button>
+                        </div>
+
+                        <div class="result-stats">
+                            <div class="stat">
+                                <span class="stat-label">Original URL</span>
+                                <span class="stat-value" id="originalUrlDisplay"></span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Created</span>
+                                <span class="stat-value" id="createdAt"></span>
+                            </div>
+                            <div class="stat" id="expiresAtStat" style="display: none;">
+                                <span class="stat-label">Expires</span>
+                                <span class="stat-value" id="expiresAt"></span>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-secondary" onclick="resetForm()">
+                            Create Another Link
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Features Grid -->
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Fast</h3>
+                    <p>Instant URL shortening with sub-millisecond response times</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Detailed Analytics</h3>
+                    <p>Track clicks, locations, and referrers in real-time</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Secure & Private</h3>
+                    <p>Your data is encrypted and never shared with third parties</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Custom Aliases</h3>
+                    <p>Create memorable, branded short links</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <svg class="toast-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M7 10L9 12L13 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span id="toastMessage"></span>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

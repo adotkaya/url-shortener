@@ -11,6 +11,14 @@ import (
 	"url-shortener/internal/repository"
 )
 
+// Cache interface for URL caching
+// Using an interface allows for easy testing and swapping implementations
+type Cache interface {
+	GetURL(ctx context.Context, shortCode string) (*domain.URL, error)
+	SetURL(ctx context.Context, shortCode string, url *domain.URL) error
+	DeleteURL(ctx context.Context, shortCode string) error
+}
+
 // URLService handles business logic for URL operations
 // This is the SERVICE LAYER - it sits between HTTP handlers and repositories
 //
@@ -22,13 +30,15 @@ import (
 type URLService struct {
 	urlRepo   repository.URLRepository
 	clickRepo repository.ClickRepository
+	cache     Cache // Redis cache for performance
 }
 
 // NewURLService creates a new URL service
-func NewURLService(urlRepo repository.URLRepository, clickRepo repository.ClickRepository) *URLService {
+func NewURLService(urlRepo repository.URLRepository, clickRepo repository.ClickRepository, cache Cache) *URLService {
 	return &URLService{
 		urlRepo:   urlRepo,
 		clickRepo: clickRepo,
+		cache:     cache,
 	}
 }
 
@@ -83,12 +93,30 @@ func (s *URLService) CreateShortURL(ctx context.Context, originalURL, customAlia
 		return nil, fmt.Errorf("failed to create URL: %w", err)
 	}
 
+	// Store in cache for fast access
+	// We don't fail if caching fails - it's not critical
+	if err := s.cache.SetURL(ctx, shortCode, url); err != nil {
+		fmt.Printf("Warning: failed to cache URL: %v\n", err)
+	}
+
 	return url, nil
 }
 
 // GetURL retrieves a URL by its short code or custom alias
+// Implements CACHE-ASIDE PATTERN for performance
 func (s *URLService) GetURL(ctx context.Context, shortCode string) (*domain.URL, error) {
-	// Try to get by short code first
+	// STEP 1: Check cache first (cache-aside pattern)
+	cachedURL, err := s.cache.GetURL(ctx, shortCode)
+	if err == nil && cachedURL != nil {
+		// Cache hit! Return immediately
+		// This is ~50x faster than database lookup
+		if err := cachedURL.CanBeAccessed(); err != nil {
+			return nil, err
+		}
+		return cachedURL, nil
+	}
+
+	// STEP 2: Cache miss - get from database
 	url, err := s.urlRepo.GetByShortCode(ctx, shortCode)
 	if err != nil {
 		// If not found, try custom alias
@@ -101,6 +129,12 @@ func (s *URLService) GetURL(ctx context.Context, shortCode string) (*domain.URL,
 	// Check if URL can be accessed (not expired, active)
 	if err := url.CanBeAccessed(); err != nil {
 		return nil, err
+	}
+
+	// STEP 3: Store in cache for next time
+	// Don't fail if caching fails - it's not critical
+	if err := s.cache.SetURL(ctx, shortCode, url); err != nil {
+		fmt.Printf("Warning: failed to cache URL: %v\n", err)
 	}
 
 	return url, nil

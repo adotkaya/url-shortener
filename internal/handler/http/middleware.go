@@ -2,8 +2,10 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -148,4 +150,80 @@ func Chain(middlewares ...func(http.Handler) http.Handler) func(http.Handler) ht
 		}
 		return final
 	}
+}
+
+// RateLimitMiddleware adds rate limiting to protect against abuse
+// Uses token bucket algorithm with Redis for distributed rate limiting
+func RateLimitMiddleware(limiter RateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract identifier (IP address)
+			// In production, you might use API keys instead
+			ip := extractIP(r)
+
+			// Check rate limit
+			allowed, remaining, resetTime, err := limiter.Allow(r.Context(), ip)
+			if err != nil {
+				// If rate limiting fails, allow the request (fail open)
+				// This prevents rate limiting issues from breaking the service
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Set rate limit headers (standard practice)
+			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", limiter.MaxRequests()))
+			w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
+			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", resetTime.Unix()))
+
+			if !allowed {
+				// Rate limit exceeded
+				retryAfter := int(time.Until(resetTime).Seconds())
+				if retryAfter < 0 {
+					retryAfter = 0
+				}
+
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
+				http.Error(w, "Rate limit exceeded. Please try again later.", http.StatusTooManyRequests)
+				return
+			}
+
+			// Request allowed
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RateLimiter interface for rate limiting
+type RateLimiter interface {
+	Allow(ctx context.Context, key string) (allowed bool, remaining int, resetTime time.Time, err error)
+	MaxRequests() int
+}
+
+// extractIP extracts the client IP address from the request
+// Handles X-Forwarded-For header for proxies/load balancers
+func extractIP(r *http.Request) string {
+	// Check X-Forwarded-For header (set by proxies)
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		ips := strings.Split(forwarded, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check X-Real-IP header (set by some proxies)
+	realIP := r.Header.Get("X-Real-IP")
+	if realIP != "" {
+		return realIP
+	}
+
+	// Fall back to RemoteAddr
+	// Remove port if present (e.g., "127.0.0.1:12345" -> "127.0.0.1")
+	ip := r.RemoteAddr
+	if colonIndex := strings.LastIndex(ip, ":"); colonIndex != -1 {
+		ip = ip[:colonIndex]
+	}
+
+	return ip
 }

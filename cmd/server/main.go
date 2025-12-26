@@ -12,7 +12,9 @@ import (
 
 	"url-shortener/internal/config"
 	httpHandler "url-shortener/internal/handler/http"
+	"url-shortener/internal/ratelimit"
 	"url-shortener/internal/repository/postgres"
+	redisrepo "url-shortener/internal/repository/redis"
 	"url-shortener/internal/service"
 	"url-shortener/pkg/logger"
 )
@@ -47,12 +49,28 @@ func main() {
 	defer db.Close()
 	appLogger.Info("Database connection established")
 
+	// Initialize Redis connection
+	redisClient, err := redisrepo.InitRedis(
+		cfg.Redis.RedisAddr(),
+		cfg.Redis.Password,
+		cfg.Redis.DB,
+	)
+	if err != nil {
+		appLogger.Error("Failed to connect to Redis", "error", err)
+		log.Fatalf("Redis connection failed: %v", err)
+	}
+	defer redisClient.Close()
+	appLogger.Info("Redis connection established")
+
+	// Initialize cache
+	cache := redisrepo.NewCache(redisClient, cfg.Redis.CacheTTL)
+
 	// Initialize repositories (Data Access Layer)
 	urlRepo := postgres.NewURLRepository(db)
 	clickRepo := postgres.NewClickRepository(db)
 
 	// Initialize services (Business Logic Layer)
-	urlService := service.NewURLService(urlRepo, clickRepo)
+	urlService := service.NewURLService(urlRepo, clickRepo, cache)
 
 	// Initialize HTTP handler (Presentation Layer)
 	baseURL := fmt.Sprintf("http://localhost:%s", cfg.Server.Port)
@@ -61,6 +79,9 @@ func main() {
 	// Set up HTTP routes
 	mux := http.NewServeMux()
 
+	// Serve static files (CSS, JS, images)
+	httpHandler.SetupStaticFiles(mux)
+
 	// API routes
 	mux.HandleFunc("/api/v1/urls", handler.CreateURL)
 	mux.HandleFunc("/api/v1/urls/", handler.GetURLStats) // Note: trailing slash for path matching
@@ -68,18 +89,35 @@ func main() {
 	// Health check
 	mux.HandleFunc("/health/live", handler.HealthCheck)
 
-	// Redirect route (catch-all for short codes)
+	// UI and redirect routes
 	// This must be last because it matches everything
-	mux.HandleFunc("/", handler.RedirectURL)
+	mux.HandleFunc("/", handler.ServeUI)
+
+	// Initialize rate limiter
+	rateLimiter := ratelimit.NewTokenBucketLimiter(
+		redisClient,
+		cfg.App.RateLimitPerMinute,
+		time.Minute,
+		cfg.App.RateLimitPerMinute+20, // Allow burst of 20 extra requests
+	)
 
 	// Apply middleware
 	// Middleware is applied in reverse order (last middleware wraps first)
-	finalHandler := httpHandler.Chain(
+	var finalHandler http.Handler = mux
+
+	// Only apply rate limiting if enabled in config
+	if cfg.App.RateLimitEnabled {
+		finalHandler = httpHandler.RateLimitMiddleware(rateLimiter)(finalHandler)
+		appLogger.Info("Rate limiting enabled", "requests_per_minute", cfg.App.RateLimitPerMinute)
+	}
+
+	// Apply other middleware
+	finalHandler = httpHandler.Chain(
 		httpHandler.RecoveryMiddleware(appLogger.Logger),
 		httpHandler.LoggingMiddleware(appLogger.Logger),
 		httpHandler.RequestIDMiddleware,
 		httpHandler.CORSMiddleware,
-	)(mux)
+	)(finalHandler)
 
 	// Create HTTP server
 	server := &http.Server{
