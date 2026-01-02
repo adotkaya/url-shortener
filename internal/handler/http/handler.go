@@ -141,7 +141,7 @@ func (h *Handler) RedirectURL(w http.ResponseWriter, r *http.Request) {
 	shortCode := r.URL.Path[1:] // Remove leading "/"
 
 	if shortCode == "" {
-		respondError(w, http.StatusBadRequest, "Short code is required")
+		respondError(w, http.StatusBadRequest, "Short code is required!!!")
 		return
 	}
 
